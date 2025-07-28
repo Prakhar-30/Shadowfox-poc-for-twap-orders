@@ -58,7 +58,7 @@ export CRON_INTERVAL=1               # Every 10 blocks (~1 minute)
 Deploy the SimpleDEX contract on Sepolia. Assign the `Deployed to` address from the response to `DEX_ADDR`:
 
 ```bash
-forge create --broadcast --rpc-url $DESTINATION_RPC --private-key $DESTINATION_PRIVATE_KEY src/demos/twap-orders/SimpleDEX.sol:SimpleDEX
+forge create --broadcast --rpc-url $DESTINATION_RPC --private-key $DESTINATION_PRIVATE_KEY src/SimpleDEX.sol:SimpleDEX
 ```
 
 ### Step 4 — Deploy Callback Contract
@@ -66,7 +66,7 @@ forge create --broadcast --rpc-url $DESTINATION_RPC --private-key $DESTINATION_P
 Deploy the TWAP callback contract on Sepolia. Assign the `Deployed to` address to `CALLBACK_ADDR`:
 
 ```bash
-forge create --broadcast --rpc-url $DESTINATION_RPC --private-key $DESTINATION_PRIVATE_KEY src/demos/twap-orders/TWAPOrderCallback.sol:TWAPOrderCallback --constructor-args $DESTINATION_CALLBACK_PROXY_ADDR $DEX_ADDR
+forge create --broadcast --rpc-url $DESTINATION_RPC --private-key $DESTINATION_PRIVATE_KEY src/TWAPOrderCallback.sol:TWAPOrderCallback --constructor-args $DESTINATION_CALLBACK_PROXY_ADDR $DEX_ADDR
 ```
 
 ### Step 5 — Configure DEX
@@ -100,7 +100,7 @@ Deploy the reactive contract on Lasna testnet using the order ID from step 6:
 ```bash
 export ORDER_ID=1  # Use the actual order ID returned from step 6
 
-forge create --broadcast --rpc-url $REACTIVE_RPC --private-key $REACTIVE_PRIVATE_KEY src/demos/twap-orders/TWAPOrderReactive.sol:TWAPOrderReactive --value 0.01ether --constructor-args $CALLBACK_ADDR $SYSTEM_CONTRACT_ADDR $ORDER_ID $CRON_INTERVAL $MAX_EXECUTIONS
+forge create --legacy --broadcast --rpc-url $REACTIVE_RPC --private-key $REACTIVE_PRIVATE_KEY src/TWAPOrderReactive.sol:TWAPOrderReactive --value 0.01ether --constructor-args $CALLBACK_ADDR $SYSTEM_CONTRACT_ADDR $ORDER_ID $CRON_INTERVAL $MAX_EXECUTIONS
 ```
 
 ### Step 8 — Monitor Execution
@@ -152,3 +152,21 @@ A user wants to buy SEPO tokens with $100 USDC over 20 minutes using 1-minute in
 5. **Result**: $5 worth of SEPO purchased every minute until $100 is spent
 
 The system automatically handles the entire process, ensuring consistent execution without manual intervention.
+
+## Proof of System Working
+
+The TWAP order system has been successfully deployed and tested. You can verify the system's operation by examining the following contract interactions:
+
+### Live Contract Addresses & Transaction History:
+
+**SimpleDEX Contract (Sepolia)**:
+- **Address**: [0x9A9538E2D88ddCD9b45Cfd53131eAdc93252A080](https://sepolia.etherscan.io/address/0x9A9538E2D88ddCD9b45Cfd53131eAdc93252A080#events)
+- **Events**: Shows token swaps and liquidity operations
+
+**TWAPOrderCallback Contract (Sepolia)**:
+- **Address**: [0x540ca727475d46395184e8e5436154f89526d6d8](https://sepolia.etherscan.io/address/0x540ca727475d46395184e8e5436154f89526d6d8/advanced#events)
+- **Events**: Shows TWAP order creation, execution, and completion events
+
+**TWAPOrderReactive Contract (Lasna)**:
+- **Address**: [0x49abe186a9b24f73e34ccae3d179299440c352ac](https://lasna.reactscan.net/address/0x49abe186a9b24f73e34ccae3d179299440c352ac/contract/0x0ab16de452e4cdd82f22968dc6abe160cda974d2?screen=transactions)
+- **Transactions**: Shows reactive contract deployment and cross-chain callback executions
