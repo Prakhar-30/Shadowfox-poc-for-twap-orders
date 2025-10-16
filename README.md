@@ -20,10 +20,10 @@ The **TWAP Order System Demo** implements a reactive smart contract system that 
 
 Before proceeding further, configure these environment variables:
 
-* `DESTINATION_RPC` — RPC URL for Sepolia testnet where DEX and callback contracts are deployed.
-* `DESTINATION_PRIVATE_KEY` — Private key for signing transactions on Sepolia testnet.
-* `REACTIVE_RPC` — RPC URL for the Reactive Network (Lasna testnet).
-* `REACTIVE_PRIVATE_KEY` — Private key for signing transactions on the Reactive Network.
+* `SEPOLIA_RPC` — RPC URL for Sepolia testnet where DEX and callback contracts are deployed.
+* `PRIVATE_KEY` — Private key for signing transactions on Sepolia testnet.
+* `LASNA_RPC` — RPC URL for the Reactive Network (Lasna testnet).
+* `PRIVATE_KEY` — Private key for signing transactions on the Reactive Network.
 * `DESTINATION_CALLBACK_PROXY_ADDR` — The service address on Sepolia (see [Reactive Docs](https://dev.reactive.network/origins-and-destinations#callback-proxy-address)).
 * `SYSTEM_CONTRACT_ADDR` — The service address on the Reactive Network (see [Reactive Docs](https://dev.reactive.network/reactive-mainnet#overview)).
 * `CRON_TOPIC` — An event enabling time-based automation at fixed block intervals (see [Reactive Docs](https://dev.reactive.network/reactive-library#cron-functionality)).
@@ -45,11 +45,11 @@ export TOKEN_OUT=0x642037396D62891302f06dDE0bc21071834A0260  # SEPO token addres
 
 ### Step 2 — TWAP Order Parameters
 
-Define TWAP order parameters for $100 USDC → SEPO over 20 minutes:
+Define TWAP order parameters for $100 USDC → SEPO over 5 minutes:
 
 ```bash
 export TOTAL_AMOUNT=100000000        # 100 USDC (6 decimals)
-export MAX_EXECUTIONS=20             # 20 executions over 20 minutes
+export MAX_EXECUTIONS=5             # 5 executions over 5 minutes
 export CRON_INTERVAL=1               # Every 10 blocks (~1 minute)
 ```
 
@@ -58,7 +58,7 @@ export CRON_INTERVAL=1               # Every 10 blocks (~1 minute)
 Deploy the SimpleDEX contract on Sepolia. Assign the `Deployed to` address from the response to `DEX_ADDR`:
 
 ```bash
-forge create --broadcast --rpc-url $DESTINATION_RPC --private-key $DESTINATION_PRIVATE_KEY src/SimpleDEX.sol:SimpleDEX
+forge create --broadcast --rpc-url $SEPOLIA_RPC --private-key $PRIVATE_KEY SimpleDEX.sol:SimpleDEX
 ```
 
 ### Step 4 — Deploy Callback Contract
@@ -66,7 +66,7 @@ forge create --broadcast --rpc-url $DESTINATION_RPC --private-key $DESTINATION_P
 Deploy the TWAP callback contract on Sepolia. Assign the `Deployed to` address to `CALLBACK_ADDR`:
 
 ```bash
-forge create --broadcast --rpc-url $DESTINATION_RPC --private-key $DESTINATION_PRIVATE_KEY src/TWAPOrderCallback.sol:TWAPOrderCallback --constructor-args $DESTINATION_CALLBACK_PROXY_ADDR $DEX_ADDR
+forge create --broadcast --rpc-url $SEPOLIA_RPC --private-key $PRIVATE_KEY TWAPOrderCallback.sol:TWAPOrderCallback --constructor-args $SEPOLIA_PROXY $DEX_ADDR
 ```
 
 ### Step 5 — Configure DEX
@@ -75,10 +75,13 @@ Set exchange rates and add liquidity to the DEX:
 
 ```bash
 # Set exchange rate (example: 1 USDC = 2.5 SEPO, rate in basis points)
-cast send $DEX_ADDR 'setExchangeRate(address,address,uint256)' --rpc-url $DESTINATION_RPC --private-key $DESTINATION_PRIVATE_KEY $TOKEN_IN $TOKEN_OUT 25000
+cast send $DEX_ADDR 'setExchangeRate(address,address,uint256)' --rpc-url $SEPOLIA_RPC --private-key $PRIVATE_KEY $TOKEN_IN $TOKEN_OUT 250000000000000000
 
 # Add liquidity for SEPO (assuming 18 decimals, adding 10,000 SEPO)
-cast send $DEX_ADDR 'addLiquidity(address,uint256)' --rpc-url $DESTINATION_RPC --private-key $DESTINATION_PRIVATE_KEY $TOKEN_OUT 10000000000000000000000
+
+cast send $TOKEN_OUT "approve(address,uint256)" --rpc-url $SEPOLIA_RPC --private-key $PRIVATE_KEY $DEX_ADDR 10000000000000000000000
+
+cast send $DEX_ADDR 'addLiquidity(address,uint256)' --rpc-url $SEPOLIA_RPC --private-key $PRIVATE_KEY $TOKEN_OUT 10000000000000000000000
 ```
 
 ### Step 6 — Create TWAP Order
@@ -87,10 +90,10 @@ Approve tokens and create a TWAP order:
 
 ```bash
 # Approve callback contract to spend your tokens
-cast send $TOKEN_IN 'approve(address,uint256)' --rpc-url $DESTINATION_RPC --private-key $DESTINATION_PRIVATE_KEY $CALLBACK_ADDR $TOTAL_AMOUNT
+cast send $TOKEN_IN 'approve(address,uint256)' --rpc-url $SEPOLIA_RPC --private-key $PRIVATE_KEY $CALLBACK_ADDR $TOTAL_AMOUNT
 
 # Create TWAP order and note the returned order ID
-cast send $CALLBACK_ADDR 'createTWAPOrder(address,address,uint256,uint256)' --rpc-url $DESTINATION_RPC --private-key $DESTINATION_PRIVATE_KEY $TOKEN_IN $TOKEN_OUT $TOTAL_AMOUNT $MAX_EXECUTIONS
+cast send $CALLBACK_ADDR 'createTWAPOrder(address,address,uint256,uint256)' --rpc-url $SEPOLIA_RPC --private-key $PRIVATE_KEY $TOKEN_IN $TOKEN_OUT $TOTAL_AMOUNT $MAX_EXECUTIONS
 ```
 
 ### Step 7 — Deploy Reactive Contract
@@ -100,7 +103,7 @@ Deploy the reactive contract on Lasna testnet using the order ID from step 6:
 ```bash
 export ORDER_ID=1  # Use the actual order ID returned from step 6
 
-forge create --legacy --broadcast --rpc-url $REACTIVE_RPC --private-key $REACTIVE_PRIVATE_KEY src/TWAPOrderReactive.sol:TWAPOrderReactive --value 0.01ether --constructor-args $CALLBACK_ADDR $SYSTEM_CONTRACT_ADDR $ORDER_ID $CRON_INTERVAL $MAX_EXECUTIONS
+forge create --legacy --broadcast --rpc-url $LASNA_RPC --private-key $PRIVATE_KEY TWAPOrderReactive.sol:TWAPOrderReactive --value 1ether --constructor-args $CALLBACK_ADDR $SYSTEM_CONTRACT_ADDR $ORDER_ID $CRON_INTERVAL $MAX_EXECUTIONS
 ```
 
 ### Step 8 — Monitor Execution
@@ -116,7 +119,7 @@ The reactive contract will automatically execute the TWAP order based on the con
 Users can cancel active orders to get refunds of unexecuted amounts:
 
 ```bash
-cast send $CALLBACK_ADDR 'cancelTWAPOrder(uint256)' --rpc-url $DESTINATION_RPC --private-key $DESTINATION_PRIVATE_KEY $ORDER_ID
+cast send $CALLBACK_ADDR 'cancelTWAPOrder(uint256)' --rpc-url $SEPOLIA_RPC --private-key $PRIVATE_KEY $ORDER_ID
 ```
 
 ### Step 10 — Pause/Resume Reactive Contract (Optional)
@@ -124,13 +127,13 @@ cast send $CALLBACK_ADDR 'cancelTWAPOrder(uint256)' --rpc-url $DESTINATION_RPC -
 To pause the reactive contract monitoring:
 
 ```bash
-cast send --legacy $REACTIVE_ADDR "pause()" --rpc-url $REACTIVE_RPC --private-key $REACTIVE_PRIVATE_KEY
+cast send --legacy $REACTIVE_ADDR "pause()" --rpc-url $LASNA_RPC --private-key $PRIVATE_KEY
 ```
 
 To resume:
 
 ```bash
-cast send --legacy $REACTIVE_ADDR "resume()" --rpc-url $REACTIVE_RPC --private-key $REACTIVE_PRIVATE_KEY
+cast send --legacy $REACTIVE_ADDR "resume()" --rpc-url $LASNA_RPC --private-key $PRIVATE_KEY
 ```
 
 ## CRON Intervals Available

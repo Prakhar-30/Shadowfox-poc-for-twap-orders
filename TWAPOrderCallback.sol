@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity >=0.8.0;
 
-import '../../../lib/reactive-lib/src/abstract-base/AbstractCallback.sol';
-import '../../../lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol';
+import '/lib/reactive-lib/src/abstract-base/AbstractCallback.sol';
+import '/lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol';
 
 interface ISimpleDEX {
     function swapTokens(
